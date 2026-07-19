@@ -33,7 +33,7 @@ class Projectile {
     this.height = 20
     this.x = 0
     this.y = 0
-    this.speed = 20
+    this.speed = 10
     this.free = true
   }
 
@@ -71,6 +71,7 @@ class Enemy {
     this.y = 0
     this.positionX = positionX
     this.positionY = positionY
+    this.markedForDeletion = false
   }
 
   draw(context) {
@@ -80,6 +81,14 @@ class Enemy {
   update(x, y) {
     this.x = x + this.positionX
     this.y = y + this.positionY
+
+    // check collision enemies - projectiles
+    this.game.projectilesPool.forEach(projectile => {
+      if(!projectile.free && this.game.checkCollision(this, projectile)) {
+        this.markedForDeletion = true
+        projectile.reset()
+      }
+    })
   }
 }
 
@@ -115,6 +124,8 @@ class Wave {
       enemy.update(this.x, this.y)
       enemy.draw(context)
     })
+
+    this.enemies = this.enemies.filter(enemy => !enemy.markedForDeletion)
   }
 
   create() {
@@ -140,8 +151,8 @@ class Game {
     this.numberOfProjectiles = 10
     this.createProjectiles();
 
-    this.columns = 3
-    this.rows = 3
+    this.columns = 5
+    this.rows = 7
     this.enemySize = 60
 
     this.waves = []
@@ -183,6 +194,15 @@ class Game {
       if(this.projectilesPool[i].free) return this.projectilesPool[i]
     }
   }
+
+  checkCollision(a, b) {
+    return (
+      a.x < b.x + b.width &&
+      a.x + a.width > b.x &&
+      a.y < b.y + b.height &&
+      a.y + a.height > b.y
+    )
+  }
 }
 
 window.addEventListener('load', function() {
@@ -191,6 +211,7 @@ window.addEventListener('load', function() {
   canvas.width = 600
   canvas.height = 800
   ctx.fillStyle= 'white'
+  ctx.strokeStyle = 'white'
 
   const game = new Game(canvas);
 
