@@ -150,9 +150,9 @@ class Enemy {
         projectile.reset()
       }
     })
-
-    if(this.lives < 1) {
-      if(this.game.spriteUpdate) this.frameX++
+    // enemy destroyed
+    if(this.lives < 1 && this.game.spriteUpdate) {
+      this.frameX++
 
       if(this.frameX > this.maxFrame) {
         this.markedForDeletion = true
@@ -205,6 +205,99 @@ class Rhinomorph extends Enemy {
   }
 }
 
+class Boss {
+  constructor(game, bossLives) {
+    this.game = game
+    this.width = 200
+    this.height = 200
+    this.x = this.game.width * 0.5 - this.width * 0.5
+    this.y = -this.height;
+    this.speedX = Math.random() < 0.5 ? -1 : 1
+    this.speedY = 0
+    this.lives = bossLives
+    this.maxLives = this.lives
+    this.markedForDeletion = false
+    this.image = document.getElementById('boss')
+    this.frameX = 0
+    this.frameY = Math.floor(Math.random() * 4)
+    this.maxFrame = 11
+    this.markedForDeletion = false
+  }
+
+  draw(context) {
+    context.drawImage(
+      this.image,                   // src
+      this.frameX * this.width,     // src x
+      this.frameY * this.height,    // src y
+      this.width,                   // src w
+      this.height,                  // src h
+      this.x,                       // pos x
+      this.y,                       // pos y
+      this.width,                   // stretch w
+      this.height                   // stretch h
+    )
+    if(this.lives > 0) {
+      context.save()
+      context.textAlign = 'center'
+      context.shadowOffsetX = 3
+      context.shadowOffsetY = 3
+      context.shadowColor = 'black'
+      context.fillText(this.lives, this.x + this.width * 0.5, this.y + 50)
+      context.restore()
+    }
+  }
+
+  update() {
+    this.speedY = 0
+    
+    if(this.game.spriteUpdate && this.lives > 0) this.frameX = 0
+
+    if(this.y < 0) this.y += 4
+    if(this.x < 0 || this.x > this.game.width - this.width && this.lives > 0) {
+      this.speedX *= -1
+      this.speedY = this.height * 0.5
+    }
+
+    this.x += this.speedX
+    this.y += this.speedY
+
+    // check collision boss - projectiles
+    this.game.projectilesPool.forEach(projectile => {
+      if(!projectile.free && this.lives > 0 && this.game.checkCollision(this, projectile) && this.y >= 0) {
+        this.hit(1)
+        projectile.reset()
+      }
+    })
+
+    // check collision enemies - player
+    if(this.game.checkCollision(this, this.game.player) && this.lives > 0) {
+      this.game.gameOver = true
+    }
+
+    // boss destroyed
+    if(this.lives < 1 && this.game.spriteUpdate) {
+      this.frameX++
+
+      if(this.frameX > this.maxFrame) {
+        this.markedForDeletion = true
+        this.game.score += this.maxLives
+        this.game.bossLives += 10
+        if(!this.gameOver) this.game.newWave()
+      }
+    }
+
+    // lose condition
+    if(this.y + this.height > this.game.height) {
+      this.game.gameOver = true
+    }
+  }
+
+  hit(damage) {
+    this.lives -= damage
+    if (this.lives > 0) this.frameX = 1
+  }
+}
+
 class Wave {
   constructor(game) {
     this.game = game
@@ -216,6 +309,7 @@ class Wave {
     this.speedY = 0
     this.enemies = []
     this.nextWaveTrigger = false
+    this.markedForDeletion = false
     this.create()
   }
 
@@ -238,6 +332,7 @@ class Wave {
     })
 
     this.enemies = this.enemies.filter(enemy => !enemy.markedForDeletion)
+    if(this.enemies.length <= 0) this.markedForDeletion = true
   }
 
   create() {
@@ -268,20 +363,13 @@ class Game {
     this.createProjectiles();
     this.fired = false
 
-    this.columns = 2
-    this.rows = 2
     this.enemySize = 80
-
-    this.waves = []
-    this.waves.push(new Wave(this))
-    this.waveCount = 1
 
     this.spriteUpdate = false
     this.spriteTimer = 0
     this.spriteInterval = 150
 
-    this.score = 0
-    this.gameOver = false
+    this.restart()
 
     // event listeners
     window.addEventListener('keydown', e => {
@@ -323,11 +411,14 @@ class Game {
       
       if(wave.enemies.length < 1 && !wave.nextWaveTrigger && !this.gameOver) {
         this.newWave()
-        this.waveCount++
         wave.nextWaveTrigger = true
-        if(this.player.lives < this.player.maxLives) this.player.lives++
       }
     })
+    this.bossArray.forEach(boss => {
+      boss.draw(context)
+      boss.update()
+    })
+    this.bossArray = this.bossArray.filter(boss => !boss.markedForDeletion)
   }
 
   createProjectiles() {
@@ -353,31 +444,73 @@ class Game {
 
   drawStatusText(context) {
     context.save()
+
     context.shadowOffsetX = 2
     context.shadowOffsetY = 2
-    context.shadowColor = 'black'
+    context.shadowColor = "black"
 
-    context.fillText('Score: ' + this.score, 20, 40)
-    context.fillText('Wave: ' + this.waveCount, 20, 80)
+    // =========================
+    // Left HUD
+    // =========================
+    context.textAlign = "left"
+    context.font = "30px Impact"
 
-    for(let i = 0; i < this.player.maxLives; i++) {
+    context.fillText(`Score: ${this.score}`, 20, 40)
+    context.fillText(`Wave: ${this.waveCount}`, 20, 80)
+
+    // Lives
+    for (let i = 0; i < this.player.maxLives; i++) {
       context.strokeRect(20 + 20 * i, 100, 10, 15)
     }
-    for(let i = 0; i < this.player.lives; i++) {
+
+    for (let i = 0; i < this.player.lives; i++) {
       context.fillRect(20 + 20 * i, 100, 10, 15)
     }
 
-    if(this.gameOver) {
-      context.textAlign = 'center'
-      context.font = '100px Impact'
-      context.fillText('GAME OVER!', this.width * 0.5, this.height * 0.5)
-      context.font = '20px Impact'
-      context.fillText('Press R to restart!', this.width * 0.5, this.height * 0.5 + 30)
+    // =========================
+    // Right HUD - Controls
+    // =========================
+    context.textAlign = "right"
+    context.font = "22px Impact"
+
+    const right = this.width - 20
+
+    context.fillText("Controls", right, 40)
+
+    context.font = "18px Impact"
+
+    context.fillText("← →   Move", right, 70)
+    context.fillText("↑      Shoot", right, 95)
+
+    // =========================
+    // Game Over
+    // =========================
+    if (this.gameOver) {
+      context.textAlign = "center"
+
+      context.font = "100px Impact"
+      context.fillText("GAME OVER!", this.width * 0.5, this.height * 0.5)
+
+      context.font = "24px Impact"
+      context.fillText(
+        "Press R to Restart",
+        this.width * 0.5,
+        this.height * 0.5 + 50
+      )
     }
+
     context.restore()
   }
 
   newWave() {
+    this.waveCount++
+    if(this.player.lives < this.player.maxLives) this.player.lives++
+    
+    if (this.waveCount % 3 === 0) {
+      this.bossArray.push(new Boss(this, this.bossLives))
+      return 
+    }
+
     if(Math.random() < 0.5) {
       this.columns++
     } else if(this.rows * this.enemySize < this.height * 0.6) {
@@ -385,6 +518,7 @@ class Game {
     }
     
     this.waves.push(new Wave(this))
+    this.waves = this.waves.filter(wave => !wave.markedForDeletion)
   }
 
   restart() {
@@ -395,6 +529,8 @@ class Game {
 
     this.waves = []
     this.waves.push(new Wave(this))
+    this.bossArray = []
+    this.bossLives = 10
     this.waveCount = 1
 
     this.score = 0

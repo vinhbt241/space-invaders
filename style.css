@@ -7,6 +7,6 @@
   background: url('assets/background.png');
 }
 
-#beetlemorph, #player, #player_jets, #rhinomorph {
+#beetlemorph, #player, #player_jets, #rhinomorph, #boss {
   display: none;
 }
