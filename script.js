@@ -101,14 +101,15 @@ class Enemy {
 
     // check collision enemies - projectiles
     this.game.projectilesPool.forEach(projectile => {
-      if(!projectile.free && this.game.checkCollision(this, projectile)) {
+      if(!projectile.free && this.lives > 0 && this.game.checkCollision(this, projectile)) {
         this.hit(1)
         projectile.reset()
       }
     })
 
     if(this.lives < 1) {
-      this.frameX++
+      if(this.game.spriteUpdate) this.frameX++
+
       if(this.frameX > this.maxFrame) {
         this.markedForDeletion = true
         if(!this.game.gameOver) this.game.score += this.maxLives
@@ -142,7 +143,7 @@ class BeetleMorph extends Enemy {
     this.image = document.getElementById('beetlemorph')
     this.frameX = 0
     this.maxFrame = 2
-    this.frameY = 0
+    this.frameY = Math.floor(Math.random() * 4)
     this.lives = 1
     this.maxLives = this.lives
   }
@@ -215,6 +216,10 @@ class Game {
     this.waves.push(new Wave(this))
     this.waveCount = 1
 
+    this.spriteUpdate = false
+    this.spriteTimer = 0
+    this.spriteInterval = 100
+
     this.score = 0
     this.gameOver = false
 
@@ -236,7 +241,16 @@ class Game {
     })
   }
 
-  render(context) {
+  render(context, deltaTime) {
+    // sprite timing
+    if(this.spriteTimer > this.spriteInterval) {
+      this.spriteTimer = 0
+      this.spriteUpdate = true
+    } else {
+      this.spriteTimer += deltaTime
+      this.spriteUpdate = false
+    }
+
     this.drawStatusText(context)
     this.player.draw(context)
     this.player.update()
@@ -336,11 +350,14 @@ window.addEventListener('load', function() {
 
   const game = new Game(canvas);
 
-  function animate() {
+  let lastTime = 0
+  function animate(timeStamp) {
+    const deltaTime = timeStamp - lastTime
+    lastTime = timeStamp
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    game.render(ctx)
+    game.render(ctx, deltaTime)
     window.requestAnimationFrame(animate)
   }
 
-  animate()
+  animate(0)
 })
