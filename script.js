@@ -1,21 +1,62 @@
 class Player {
   constructor(game) {
     this.game = game
-    this.width = 100
-    this.height = 100
+    this.width = 140
+    this.height = 120
     this.x = this.game.width * 0.5 - this.width * 0.5
     this.y = this.game.height - this.height
     this.speed = 5
     this.lives = 3
+    this.maxLives = 10
+    this.image = document.getElementById('player')
+    this.jets_image = document.getElementById('player_jets')
+    this.playerFrame = 0
+    this.jetsFrame = 1
   }
 
   draw(context) {
-    context.fillRect(this.x, this.y, this.width, this.height)
+    if(this.game.keys.indexOf('ArrowUp') > -1) {
+      this.playerFrame = 1
+    } else {
+      this.playerFrame = 0
+    }
+
+    // player
+    context.drawImage(
+      this.image,                   // src
+      this.playerFrame * this.width,     // src x
+      0,                            // src y
+      this.width,                   // src w
+      this.height,                  // src h
+      this.x,                       // pos x
+      this.y,                       // pos y
+      this.width,                   // stretch w
+      this.height                   // stretch h
+    )
+    //jets
+    context.drawImage(
+      this.jets_image,                   // src
+      this.jetsFrame * this.width,       // src x
+      0,                                 // src y
+      this.width,                        // src w
+      this.height,                       // src h
+      this.x,                            // pos x
+      this.y,                            // pos y
+      this.width,                        // stretch w
+      this.height                        // stretch h
+    )
   }
 
   update() {
-    if(this.game.keys.indexOf('ArrowLeft') > - 1) this.x -= this.speed
-    if(this.game.keys.indexOf('ArrowRight') > - 1) this.x += this.speed
+    if(this.game.keys.indexOf('ArrowLeft') > - 1) {
+      this.x -= this.speed
+      this.jetsFrame = 0
+    } else if(this.game.keys.indexOf('ArrowRight') > - 1) {
+      this.x += this.speed
+      this.jetsFrame = 2
+    } else {
+      this.jetsFrame = 1
+    }
 
     // boundaries
     if(this.x < -this.width * 0.5) this.x = -this.width * 0.5
@@ -36,7 +77,7 @@ class Player {
 
 class Projectile {
   constructor() {
-    this.width = 8
+    this.width = 3
     this.height = 20
     this.x = 0
     this.y = 0
@@ -46,7 +87,10 @@ class Projectile {
 
   draw(context) {
     if (!this.free) {
+      context.save()
+      context.fillStyle = 'gold'
       context.fillRect(this.x, this.y, this.width, this.height)
+      context.restore()
     }
   }
 
@@ -116,18 +160,13 @@ class Enemy {
       }
     }
     // check collision enemies - player
-    if(this.game.checkCollision(this, this.game.player)) {
-      this.markedForDeletion = true
-
-      if(!this.gameOver && this.game.score > 0) this.game.score--
-
+    if(this.game.checkCollision(this, this.game.player) && this.lives > 0) {
+      this.lives = 0
       this.game.player.lives--
-      if(this.game.player.lives < 1) this.game.gameOver=true
     }
     // lose condition
-    if(this.y + this.height > this.game.height) {
+    if(this.y + this.height > this.game.height || this.game.player.lives < 1) {
       this.game.gameOver = true
-      this.markedForDeletion = true
     }
   }
 
@@ -265,7 +304,7 @@ class Game {
         this.newWave()
         this.waveCount++
         wave.nextWaveTrigger = true
-        this.player.lives++
+        if(this.player.lives < this.player.maxLives) this.player.lives++
       }
     })
   }
@@ -300,8 +339,11 @@ class Game {
     context.fillText('Score: ' + this.score, 20, 40)
     context.fillText('Wave: ' + this.waveCount, 20, 80)
 
+    for(let i = 0; i < this.player.maxLives; i++) {
+      context.strokeRect(20 + 20 * i, 100, 10, 15)
+    }
     for(let i = 0; i < this.player.lives; i++) {
-      context.fillRect(20 + 10 * i, 100, 5, 20)
+      context.fillRect(20 + 20 * i, 100, 10, 15)
     }
 
     if(this.gameOver) {
